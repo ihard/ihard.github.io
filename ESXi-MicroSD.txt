@@ -1,0 +1,44 @@
+ESXi установлена на MicroSD карту 32Gb
+
+Система занимает несколько Gb остальное пустое место которое через GUI не задействовать.
+
+Смотрим текущую разметку
+
+partedUtil getptbl /vmfs/devices/disks/mpx.vmhba32\:C0\:T0\:L0
+gpt
+3880 255 63 62333952
+1 64 8191 C12A7328F81F11D2BA4B00A0C93EC93B systemPartition 128
+5 8224 520191 EBD0A0A2B9E5443387C068B6B72699C7 linuxNative 0
+6 520224 1032191 EBD0A0A2B9E5443387C068B6B72699C7 linuxNative 0
+7 1032224 1257471 9D27538040AD11DBBF97000C2911D1B8 vmkDiagnostic 0
+8 1257504 1843199 EBD0A0A2B9E5443387C068B6B72699C7 linuxNative 0
+9 1843200 7086079 9D27538040AD11DBBF97000C2911D1B8 vmkDiagnostic 0
+
+Смотрим доступные сектора для разметки
+partedUtil getUsableSectors /vmfs/devices/disks/mpx.vmhba32\:C0\:T0\:L0
+34 62333918
+
+Формируем команду для добавления 10-го раздела (нужно включить все существующие).
+В дальнейшем на разделе создадим Datastore поэтому идентификатор будет AA31E02A400F11DB9590000C2911D1B8 (vmfs).
+
+10 7086080 62333918 AA31E02A400F11DB9590000C2911D1B8 0
+
+partedUtil setptbl /vmfs/devices/disks/mpx.vmhba32\:C0\:T0\:L0 gpt "1 64 8191 C12A7328F81F11D2BA4B00A0C93EC93B 128" "5 8224 520191 EBD0A0A2B9E5443387C068B6B72699C7 0" "6 520224 1032191 EBD0A0A2B9E5443387C068B6B72699C7 0" "7 1032224 1257471 9D27538040AD11DBBF97000C2911D1B8 0" "8 1257504 1843199 EBD0A0A2B9E5443387C068B6B72699C7 0" "9 1843200 7086079 9D27538040AD11DBBF97000C2911D1B8 0" "10 7086080 62333918 AA31E02A400F11DB9590000C2911D1B8 0"
+
+Проверяем
+partedUtil getptbl /vmfs/devices/disks/mpx.vmhba32\:C0\:T0\:L0
+gpt
+3880 255 63 62333952
+1 64 8191 C12A7328F81F11D2BA4B00A0C93EC93B systemPartition 128
+5 8224 520191 EBD0A0A2B9E5443387C068B6B72699C7 linuxNative 0
+6 520224 1032191 EBD0A0A2B9E5443387C068B6B72699C7 linuxNative 0
+7 1032224 1257471 9D27538040AD11DBBF97000C2911D1B8 vmkDiagnostic 0
+8 1257504 1843199 EBD0A0A2B9E5443387C068B6B72699C7 linuxNative 0
+9 1843200 7086079 9D27538040AD11DBBF97000C2911D1B8 vmkDiagnostic 0
+10 7086080 62333918 AA31E02A400F11DB9590000C2911D1B8 vmfs 0
+
+Создаем Datastore MicroSD на новом разделе
+vmkfstools -C vmfs6 -b 1m -S MicroSD /vmfs/devices/disks/mpx.vmhba32:C0:T0:L0:10
+
+В GUI можно увидеть новый Datastore и уже начать использовать.
+Ресурс MicroSD все же меньше SSD или HDD дисков поэтому рекумендуется использовать её для редко-перезаписываемых данных, например для хранения ISO образов.
